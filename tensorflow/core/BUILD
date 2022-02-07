@@ -81,21 +81,9 @@ load(
 )
 
 # buildifier: disable=same-origin-load
-load("//tensorflow:tensorflow.bzl", "cc_header_only_library")
+load("//tensorflow:tensorflow.google.bzl", "cc_header_only_library", "filegroup", "get_compatible_with_portable", "if_nccl", "tensorflow_opensource_extra_deps", "tf_monitoring_framework_deps")
 
 # buildifier: disable=same-origin-load
-load("//tensorflow:tensorflow.bzl", "if_nccl")
-
-# buildifier: disable=same-origin-load
-load("//tensorflow:tensorflow.bzl", "tensorflow_opensource_extra_deps")
-
-# buildifier: disable=same-origin-load
-
-# buildifier: disable=same-origin-load
-load("//tensorflow:tensorflow.bzl", "tf_monitoring_framework_deps")
-
-# buildifier: disable=same-origin-load
-load("//tensorflow:tensorflow.bzl", "filegroup")
 
 # For platform specific build config
 load(
@@ -128,7 +116,6 @@ load(
     "//third_party/mkl:build_defs.bzl",
     "if_mkl",
 )
-load("//tensorflow:tensorflow.bzl", "get_compatible_with_portable")
 
 package(
     default_visibility = [
@@ -654,6 +641,7 @@ cc_library(
         "//tensorflow/core/kernels:pooling_ops",
         "//tensorflow/core/kernels:quantized_ops",
         "//tensorflow/core/kernels:ragged_ops",
+        "//tensorflow/core/kernels:random_index_shuffle_ops",
         "//tensorflow/core/kernels:random_ops",
         "//tensorflow/core/kernels:stateful_random_ops",
         "//tensorflow/core/kernels:random_binomial_op",
@@ -998,6 +986,7 @@ filegroup(
         "ragged_ops",
         "composite_tensor_ops_op_lib",
         "random_grad_op_lib",
+        "random_index_shuffle_ops_op_lib",
         "random_ops_op_lib",
         "resource_variable_ops_op_lib",
         "risc_ops_op_lib",

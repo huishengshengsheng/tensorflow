@@ -1,7 +1,6 @@
 # Tests of TensorFlow kernels written using the Python API.
 
-load("//tensorflow:tensorflow.bzl", "cuda_py_test")
-load("//tensorflow:tensorflow.bzl", "tf_py_test")
+load("//tensorflow:tensorflow.google.bzl", "cuda_py_test", "tf_py_test")
 
 package(
     default_visibility = ["//tensorflow:internal"],
@@ -224,6 +223,12 @@ cuda_py_test(
         "//tensorflow/python:stateless_random_ops",
         "//third_party/py/numpy",
     ],
+)
+
+tf_py_test(
+    name = "random_index_shuffle_test",
+    srcs = ["random_index_shuffle_test.py"],
+    shard_count = 10,
 )
 
 py_library(
