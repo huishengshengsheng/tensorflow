@@ -1,3 +1,4 @@
+# buildifier: disable=same-origin-load
 load("//tensorflow:tensorflow.bzl", "tf_custom_op_py_library")
 load(
     "//tensorflow:tensorflow.bzl",
@@ -5,7 +6,7 @@ load(
     "tf_copts",
     "tf_custom_op_library",
     "tf_gen_op_wrapper_py",
-    "tf_py_test",
+    #"tf_py_test",
 )
 
 package(
@@ -71,20 +72,17 @@ tf_custom_op_py_library(
     srcs_version = "PY3",
     deps = [
         ":gen_custom_aggregator_op_wrapper",
-        "//tensorflow/python:framework_for_generated_wrappers",
     ],
 )
 
-tf_py_test(
+py_test(
     name = "custom_aggregator_op_test",
     size = "small",
     srcs = ["custom_aggregator_op_test.py"],
-    tags = [
-        "no_oss",  # TODO(b/220688154): Enable OSS tests.
-    ],
     deps = [
         ":custom_aggregator_op",
-        "//tensorflow:tensorflow_py",
-        "//tensorflow/compiler/mlir/quantization/tensorflow/python:quantize_model_wrapper",
+        "//tensorflow/compiler/mlir/quantization/tensorflow/python:pywrap_quantize_model",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:pywrap_tensorflow",
     ],
 )

@@ -116,7 +116,6 @@ cc_library(
         "//tensorflow/compiler/mlir/quantization/tensorflow/utils:fake_quant_utils",
         "//tensorflow/compiler/mlir/tensorflow",
         "//tensorflow/compiler/mlir/tensorflow:tensorflow_ops",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
         "//tensorflow/core:framework",
         "//tensorflow/core/platform:env",
         "//tensorflow/core/platform:macros",

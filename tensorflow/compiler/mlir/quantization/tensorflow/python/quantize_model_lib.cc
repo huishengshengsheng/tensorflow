@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/compiler/mlir/quantization/tensorflow/python/quantize_model.h"
+#include "tensorflow/compiler/mlir/quantization/tensorflow/python/quantize_model_lib.h"
 
 #include <memory>
 #include <string>
@@ -36,8 +36,11 @@ limitations under the License.
 #include "mlir/Pass/Pass.h"  // from @llvm-project
 #include "mlir/Pass/PassManager.h"  // from @llvm-project
 #include "mlir/Transforms/Passes.h"  // from @llvm-project
+#include "pybind11/numpy.h"
+#include "pybind11/pybind11.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/compiler/mlir/lite/quantization/quantization_config.h"
+#include "tensorflow/compiler/mlir/quantization/tensorflow/calibrator/calibrator_singleton.h"
 #include "tensorflow/compiler/mlir/quantization/tensorflow/passes/passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_dialect.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
@@ -56,7 +59,7 @@ limitations under the License.
 #include "tensorflow/core/platform/path.h"
 #include "tensorflow/core/platform/statusor.h"
 #include "tensorflow/core/platform/stringpiece.h"
-#include "tensorflow/core/util/env_var.h"
+#include "tensorflow/lite/python/interpreter_wrapper/python_utils.h"
 
 using tensorflow::FunctionDefLibrary;
 using tensorflow::Graph;
@@ -90,7 +93,7 @@ absl::StatusOr<tensorflow::GraphDef> QuantizeQATModel(
   // TODO(b/213406917): Add support for the object graph based saved model input
   auto module_or = tensorflow::SavedModelSignatureDefsToMlirImport(
       saved_model_path, tag_set, absl::Span<std::string>(exported_names_vec),
-      &context, import_options, /*lift_variables=*/true, &bundle);
+      &context, import_options, true, &bundle);
 
   if (!module_or.status().ok()) {
     return absl::InternalError("failed to import SavedModel: " +
@@ -163,8 +166,7 @@ absl::StatusOr<tensorflow::GraphDef> QuantizePTQModelPreCalibration(
   // TODO(b/213406917): Add support for the object graph based saved model input
   auto module_or = tensorflow::SavedModelSignatureDefsToMlirImport(
       saved_model_path, tag_set, absl::Span<std::string>(exported_names_vec),
-      &context, import_options,
-      /*lift_variables=*/true, &bundle);
+      &context, import_options, true, &bundle);
 
   if (!module_or.status().ok()) {
     return absl::InternalError("failed to import SavedModel: " +
@@ -225,8 +227,7 @@ absl::StatusOr<tensorflow::GraphDef> QuantizePTQModelPostCalibration(
   // TODO(b/213406917): Add support for the object graph based saved model input
   auto module_or = tensorflow::SavedModelSignatureDefsToMlirImport(
       saved_model_path, tag_set, absl::Span<std::string>(exported_names_vec),
-      &context, import_options,
-      /*lift_variables=*/true, &bundle);
+      &context, import_options, true, &bundle);
 
   if (!module_or.status().ok()) {
     return absl::InternalError("failed to import SavedModel: " +
@@ -266,3 +267,89 @@ absl::StatusOr<tensorflow::GraphDef> QuantizePTQModelPostCalibration(
 
 }  // namespace quant
 }  // namespace mlir
+
+namespace tensorflow {
+
+PyObject* QuantizeQATModel(absl::string_view saved_model_path,
+                           absl::string_view exported_names_str,
+                           absl::string_view tags) {
+  auto graph_def_or =
+      mlir::quant::QuantizeQATModel(saved_model_path, exported_names_str, tags);
+  if (!graph_def_or.ok()) {
+    PyErr_Format(PyExc_ValueError, "failed to quantize QAT model");
+    return nullptr;
+  }
+
+  std::string ret_str = graph_def_or.value().SerializeAsString();
+
+  return tflite::python_utils::ConvertToPyString(ret_str.c_str(),
+                                                 ret_str.size());
+}
+
+PyObject* QuantizePTQModelPreCalibration(absl::string_view saved_model_path,
+                                         absl::string_view exported_names_str,
+                                         absl::string_view tags) {
+  auto graph_def_or = mlir::quant::QuantizePTQModelPreCalibration(
+      saved_model_path, exported_names_str, tags);
+  if (!graph_def_or.ok()) {
+    PyErr_Format(PyExc_ValueError,
+                 "failed to quantize PTQ model at the precalibration stage");
+    return nullptr;
+  }
+
+  std::string ret_str = graph_def_or.value().SerializeAsString();
+
+  return tflite::python_utils::ConvertToPyString(ret_str.c_str(),
+                                                 ret_str.size());
+}
+
+PyObject* QuantizePTQModelPostCalibration(absl::string_view saved_model_path,
+                                          absl::string_view exported_names_str,
+                                          absl::string_view tags) {
+  auto graph_def_or = mlir::quant::QuantizePTQModelPostCalibration(
+      saved_model_path, exported_names_str, tags);
+  if (!graph_def_or.ok()) {
+    PyErr_Format(PyExc_ValueError,
+                 "failed to quantize PTQ model at the postcalibration stage");
+    return nullptr;
+  }
+
+  std::string ret_str = graph_def_or.value().SerializeAsString();
+
+  return tflite::python_utils::ConvertToPyString(ret_str.c_str(),
+                                                 ret_str.size());
+}
+
+void ClearCollectedInformationFromCalibrator() {
+  calibrator::CalibratorSingleton::ClearCollectedInformation();
+}
+
+void ClearDataFromCalibrator(absl::string_view id) {
+  calibrator::CalibratorSingleton::ClearData(id);
+}
+
+float GetMinFromCalibrator(absl::string_view id) {
+  absl::optional<std::pair<float, float>> min_max =
+      calibrator::CalibratorSingleton::GetMinMax(id);
+  if (!min_max.has_value()) {
+    PyErr_Format(PyExc_ValueError, "No calibrated data for '%s'",
+                 std::string{id}.c_str());
+    throw py::error_already_set();
+  }
+
+  return min_max->first;
+}
+
+float GetMaxFromCalibrator(absl::string_view id) {
+  absl::optional<std::pair<float, float>> min_max =
+      calibrator::CalibratorSingleton::GetMinMax(id);
+  if (!min_max.has_value()) {
+    PyErr_Format(PyExc_ValueError, "No calibrated data for '%s'",
+                 std::string{id}.c_str());
+    throw py::error_already_set();
+  }
+
+  return min_max->second;
+}
+
+}  // namespace tensorflow

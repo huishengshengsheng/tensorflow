@@ -3315,6 +3315,7 @@ pywrap_tensorflow_macro(
         "//tensorflow/python/eager:pywrap_tfe_lib",
         "//tensorflow/core/util/tensor_bundle",
         "//tensorflow/compiler/mlir/python:mlir",
+        "//tensorflow/compiler/mlir/quantization/tensorflow/python:quantize_model_lib",
     ] + (tf_additional_lib_deps() +
          tf_monitoring_python_deps() +
          tf_additional_plugin_deps() +
